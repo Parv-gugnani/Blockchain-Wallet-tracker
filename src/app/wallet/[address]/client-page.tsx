@@ -43,6 +43,17 @@ export default function WalletClient({ address }: { address: string }) {
     fetchWalletData();
   }, [address]);
 
+  useEffect(() => {
+    // Check for DEX activities specifically
+    if (walletData.tokenMovements) {
+      walletData.tokenMovements.forEach(movement => {
+        if (movement.dexActivities && movement.dexActivities.length > 0) {
+          console.log(`Found DEX activities for ${movement.tokenName}:`, movement.dexActivities);
+        }
+      });
+    }
+  }, [walletData]);
+
   if (loading) return (
     <div className="flex justify-center items-center min-h-screen bg-gray-100">
       <div className="text-center">
@@ -144,15 +155,12 @@ export default function WalletClient({ address }: { address: string }) {
           </div>
         )}
 
-        {walletData.tokenMovements && walletData.tokenMovements.length > 0 && (
-          <div className="bg-white shadow-md rounded-lg p-6">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">Token Movements</h2>
-            <div className="space-y-4">
-              {walletData.tokenMovements.map((movement, index) => (
-                <div
-                  key={index}
-                  className="bg-gray-100 p-4 rounded-lg hover:shadow-sm transition-shadow"
-                >
+              {walletData.tokenMovements && walletData.tokenMovements.length > 0 && (
+                <div className="bg-white shadow-md rounded-lg p-6">
+                  <h2 className="text-xl font-semibold text-gray-800 mb-4">Token Movements</h2>
+                  <div className="space-y-4">
+                    {walletData.tokenMovements.map((movement, index) => (
+                      <div key={index} className="bg-gray-100 p-4 rounded-lg hover:shadow-sm transition-shadow">
                   <h3 className="font-bold text-blue-600 mb-2">{movement.tokenName}</h3>
                   <div className="grid md:grid-cols-2 gap-2">
                     <div>
@@ -189,29 +197,50 @@ export default function WalletClient({ address }: { address: string }) {
                       </div>
                     </div>
                   )}
+                  {/* DEX Activities Section */}
                   {movement.dexActivities && movement.dexActivities.length > 0 && (
-                    <div className="mt-3">
-                      <p className="text-gray-600 font-medium">DEX Activities</p>
-                      <div className="mt-2 space-y-2">
-                        {movement.dexActivities.map((activity, idx) => (
-                          <div key={idx} className="bg-white p-3 rounded-md shadow-sm text-sm">
-                            <div className="flex justify-between items-center">
-                              <span className="font-medium">{activity.dexName}</span>
-                              <span className="text-gray-500">
-                                {new Date(activity.timestamp * 1000).toLocaleString()}
-                              </span>
-                            </div>
-                            <div className="mt-1">
-                              <span className="capitalize">{activity.type.replace('_', ' ')}</span>
-                              <span className="text-xs font-mono ml-2 text-gray-500">
-                                {activity.txHash.substring(0, 10)}...{activity.txHash.substring(activity.txHash.length - 6)}
-                              </span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+  <div className="mt-3">
+    <p className="text-black font-medium">DEX Activities</p>
+    <div className="mt-2 bg-gray-100 p-2 rounded max-h-48 overflow-y-auto">
+      {movement.dexActivities.map((activity, idx) => (
+        <div key={idx} className="text-sm mb-2 p-2 bg-white rounded shadow-sm">
+          <div className="flex justify-between items-center">
+            <span className="font-medium text-blue-600">{activity.dexName}</span>
+            <span className="text-xs text-gray-500">
+              {new Date(activity.timestamp * 1000).toLocaleString()}
+            </span>
+          </div>
+          <div className="mt-1">
+            <span className="capitalize text-gray-700 font-medium">
+              {activity.type.replace('_', ' ')}
+            </span>
+          </div>
+          <div className="mt-1 text-xs font-mono break-all">
+            <span className="text-gray-600">Tx: </span>
+            <a
+              href={`https://etherscan.io/tx/${activity.txHash}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-500 hover:underline"
+            >
+              {activity.txHash}
+            </a>
+          </div>
+          {activity.tokenIn && (
+            <div className="mt-1 text-red-500">
+              In: {activity.tokenIn.amount.toFixed(4)} {activity.tokenIn.symbol}
+            </div>
+          )}
+          {activity.tokenOut && (
+            <div className="mt-1 text-green-500">
+              Out: {activity.tokenOut.amount.toFixed(4)} {activity.tokenOut.symbol}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  </div>
+)}
                 </div>
               ))}
             </div>
