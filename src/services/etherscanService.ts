@@ -26,12 +26,40 @@ export interface TokenHolding {
   contractAddress: string;
 }
 
+interface EtherscanInternalTransaction {
+    hash: string;
+    timeStamp: string;
+    from: string;
+    to: string;
+    value: string;
+    contractAddress: string;
+    input: string;
+    methodId: string;
+    functionName: string;
+  }
+
+export interface DexActivity {
+    txHash: string;
+    timestamp: number;
+    dexName: string;
+    type: 'swap' | 'add_liquidity' | 'remove_liquidity' | 'unknown';
+    tokenIn?: {
+      symbol: string;
+      amount: number;
+    };
+    tokenOut?: {
+      symbol: string;
+      amount: number;
+    };
+  }
+
 export interface TokenMovement {
   tokenName: string;
   totalSent: number;
   totalReceived: number;
   uniqueDestinations: string[];
   uniqueSources: string[];
+  dexActivities?: DexActivity[];
 }
 
 export interface WalletOverview {
@@ -101,26 +129,95 @@ export async function getWalletOverview(address: string): Promise<WalletOverview
 }
 
 export async function getTokenMovements(address: string): Promise<TokenMovement[]> {
-  try {
-    const response = await axios.get(BASE_URL, {
-      params: {
-        module: 'account',
-        action: 'tokentx',
-        address,
-        startblock: 0,
-        endblock: 99999999,
-        sort: 'asc',
-        apikey: ETHERSCAN_API_KEY
+    try {
+      const [tokenTxResponse, dexActivities] = await Promise.all([
+        axios.get(BASE_URL, {
+          params: {
+            module: 'account',
+            action: 'tokentx',
+            address,
+            startblock: 0,
+            endblock: 99999999,
+            sort: 'asc',
+            apikey: ETHERSCAN_API_KEY
+          }
+        }),
+        fetchDexActivities(address)
+      ]);
+
+      const movements = analyzeTokenMovements(tokenTxResponse.data.result, address);
+      const dexByToken: Record<string, DexActivity[]> = {};
+      if (dexActivities.length > 0) {
+        return movements.map(movement => ({
+          ...movement,
+          dexActivities: dexByToken[movement.tokenName] || []
+        }));
       }
-    });
 
-    return analyzeTokenMovements(response.data.result, address);
-  } catch (error) {
-    console.error('Error fetching token movements:', error);
-    throw error;
+      return movements;
+    } catch (error) {
+      console.error('Error fetching token movements:', error);
+      throw error;
+    }
   }
-}
 
+  async function fetchDexActivities(address: string): Promise<DexActivity[]> {
+    try {
+      // Get internal transactions (often used by DEXes)
+      const internalTxResponse = await axios.get(BASE_URL, {
+        params: {
+          module: 'account',
+          action: 'txlistinternal',
+          address,
+          startblock: 0,
+          endblock: 99999999,
+          sort: 'asc',
+          apikey: ETHERSCAN_API_KEY
+        }
+      });
+
+      // Define DEX contracts with proper TypeScript typing
+      const dexContracts: Record<string, string> = {
+        '0x7a250d5630b4cf539739df2c5dacb4c659f2488d': 'Uniswap V2',
+        '0x68b3465833fb72a70ecdf485e0e4c7bd8665fc45': 'Uniswap V3',
+        '0xd9e1ce17f2641f24ae83637ab66a2cca9c378b9f': 'SushiSwap'
+        // Add more DEX contracts as needed
+      };
+
+      const internalTxs: EtherscanInternalTransaction[] = internalTxResponse.data.result || [];
+
+      // Filter for DEX interactions
+      return internalTxs
+        .filter(tx => {
+          const lowerCaseTo = tx.to.toLowerCase();
+          return Object.keys(dexContracts).includes(lowerCaseTo);
+        })
+        .map(tx => {
+          const lowerCaseTo = tx.to.toLowerCase();
+          const dexName = dexContracts[lowerCaseTo] || 'Unknown DEX';
+          let type: 'swap' | 'add_liquidity' | 'remove_liquidity' | 'unknown' = 'unknown';
+
+          // Identify transaction type based on function signature
+          if (tx.functionName?.includes('swap')) {
+            type = 'swap';
+          } else if (tx.functionName?.includes('addLiquidity')) {
+            type = 'add_liquidity';
+          } else if (tx.functionName?.includes('removeLiquidity')) {
+            type = 'remove_liquidity';
+          }
+
+          return {
+            txHash: tx.hash,
+            timestamp: parseInt(tx.timeStamp),
+            dexName,
+            type
+          };
+        });
+    } catch (error) {
+      console.error('Error fetching DEX activities:', error);
+      return [];
+    }
+  }
 // Utility functions with type annotations
 function convertWeiToEth(weiBalance: string): number {
   return parseFloat(weiBalance) / 10**18;

@@ -23,8 +23,6 @@ export default function WalletClient({ address }: { address: string }) {
       try {
         setLoading(true);
         setError(null);
-
-        // Validate Ethereum address format
         const decodedAddress = decodeURIComponent(address);
         if (!decodedAddress || !/^0x[a-fA-F0-9]{40}$/.test(decodedAddress)) {
           throw new Error('Invalid Ethereum address format');
@@ -45,7 +43,6 @@ export default function WalletClient({ address }: { address: string }) {
     fetchWalletData();
   }, [address]);
 
-  // Loading state
   if (loading) return (
     <div className="flex justify-center items-center min-h-screen bg-gray-100">
       <div className="text-center">
@@ -55,7 +52,6 @@ export default function WalletClient({ address }: { address: string }) {
     </div>
   );
 
-  // Error state
   if (error) return (
     <div className="flex justify-center items-center min-h-screen bg-red-50">
       <div className="text-center p-8 bg-white shadow-lg rounded-lg">
@@ -66,7 +62,6 @@ export default function WalletClient({ address }: { address: string }) {
     </div>
   );
 
-  // No data state
   if (!walletData.overview) return (
     <div className="flex justify-center items-center min-h-screen bg-gray-100">
       <div className="text-center bg-white p-8 rounded-lg shadow-lg">
@@ -79,7 +74,6 @@ export default function WalletClient({ address }: { address: string }) {
   return (
     <div className="w-full px-4 py-8 bg-gray-50 min-h-screen">
       <div className="w-full">
-        {/* Wallet Address Header */}
         <div className="bg-white shadow-md rounded-lg p-6 mb-6">
           <h1 className="text-2xl font-bold text-gray-800 break-words">
             Wallet Details: {address}
@@ -150,7 +144,6 @@ export default function WalletClient({ address }: { address: string }) {
           </div>
         )}
 
-        {/* Token Movements Section */}
         {walletData.tokenMovements && walletData.tokenMovements.length > 0 && (
           <div className="bg-white shadow-md rounded-lg p-6">
             <h2 className="text-xl font-semibold text-gray-800 mb-4">Token Movements</h2>
@@ -183,6 +176,42 @@ export default function WalletClient({ address }: { address: string }) {
                       <p>{movement.uniqueSources.length}</p>
                     </div>
                   </div>
+
+                  {movement.uniqueDestinations.length > 0 && (
+                    <div className="mt-3">
+                      <p className="text-black font-medium">Destination Addresses</p>
+                      <div className="mt-2 bg-gray-100 p-2 rounded max-h-32 overflow-y-auto">
+                        {movement.uniqueDestinations.map((dest, idx) => (
+                          <div key={idx} className="text-sm mb-1 break-all">
+                            <span className="font-mono text-black">{dest}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {movement.dexActivities && movement.dexActivities.length > 0 && (
+                    <div className="mt-3">
+                      <p className="text-gray-600 font-medium">DEX Activities</p>
+                      <div className="mt-2 space-y-2">
+                        {movement.dexActivities.map((activity, idx) => (
+                          <div key={idx} className="bg-white p-3 rounded-md shadow-sm text-sm">
+                            <div className="flex justify-between items-center">
+                              <span className="font-medium">{activity.dexName}</span>
+                              <span className="text-gray-500">
+                                {new Date(activity.timestamp * 1000).toLocaleString()}
+                              </span>
+                            </div>
+                            <div className="mt-1">
+                              <span className="capitalize">{activity.type.replace('_', ' ')}</span>
+                              <span className="text-xs font-mono ml-2 text-gray-500">
+                                {activity.txHash.substring(0, 10)}...{activity.txHash.substring(activity.txHash.length - 6)}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
